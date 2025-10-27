@@ -1,0 +1,162 @@
+version: "3.8"
+
+services:
+  prometheus-app:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    container_name: prometheus-observer
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana-observer
+    restart: unless-stopped
+    depends_on:
+      - prometheus-app
+      - loki-app
+      - tempo
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  loki-app:
+    image: grafana/loki:latest
+    container_name: loki-observer
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/config.yml:/etc/loki/config.yaml
+      - loki-data:/loki
+    command: -config.file=/etc/loki/config.yaml
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Vector instead of Promtail
+  vector:
+    image: timberio/vector:latest-alpine
+    container_name: vector-observer
+    restart: unless-stopped
+    volumes:
+      - ./vector/vector.toml:/etc/vector/vector.toml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - vector-data:/var/lib/vector
+    command: ["--config", "/etc/vector/vector.toml"]
+    depends_on:
+      - loki-app
+    ports:
+      - "9598:9598"  # Prometheus metrics endpoint
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9598/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  the-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: the-app
+    restart: unless-stopped
+    ports:
+      - "5060:5060"
+    networks:
+      - monitoring
+    depends_on:
+      - otel-collector
+    environment:
+      - GIN_MODE=release
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5060/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+  
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collection-config.yml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"  # OTLP gRPC receiver
+      - "4318:4318"  # OTLP HTTP receiver
+      - "8888:8888"  # Prometheus metrics
+    networks:
+      - monitoring
+    depends_on:
+      - tempo
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:13133/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo.yaml
+      - tempo-data:/tmp
+    ports:
+      - "3200:3200"   # Tempo UI
+      - "4317"        # OTLP gRPC
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3200/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  monitoring:
+    external: true
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+  vector-data:
+  tempo-data:

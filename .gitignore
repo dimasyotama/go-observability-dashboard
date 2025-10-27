@@ -1,0 +1,40 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+main
+
+# Go workspace
+go.work
+
+# Dependencies
+vendor/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary
+tmp/
+temp/
+
+# Docker volumes
+tempo-data/
+loki-data/
+prometheus-data/
+grafana-data/
+vector-data/

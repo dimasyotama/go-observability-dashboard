@@ -1,0 +1,81 @@
+# Vector configuration for collecting Docker logs and sending to Loki
+
+# Data directory for Vector state
+data_dir = "/var/lib/vector"
+
+# Source: Collect logs from Docker containers
+[sources.docker_logs]
+  type = "docker_logs"
+  # Only collect logs from the-app container
+  include_containers = ["the-app"]
+  # Include container metadata
+  include_labels = ["*"] # <-- Corrected previously
+  include_images = ["*"] # <-- Corrected previously
+
+# Transform: Add custom labels and parse logs
+[transforms.add_labels]
+  type = "remap"
+  inputs = ["docker_logs"]
+  source = '''
+    # Add service name label
+    .service_name = "the-app"
+    
+    # Add job label for compatibility with Grafana dashboards
+    .job = "docker-logs"
+    
+    # Extract container name without leading slash
+    if exists(.container_name) {
+      .container_name = replace!(.container_name, "/", "")
+    }
+    
+    # Add environment label
+    .environment = "development"
+  '''
+
+# Transform: Parse JSON logs if they exist
+[transforms.parse_json]
+  type = "remap"
+  inputs = ["add_labels"]
+  source = '''
+    # Try to parse message as JSON
+    parsed, err = parse_json(.message)
+    if err == null {
+      . = merge!(., parsed)
+    }
+  '''
+
+# Sink: Send logs to Loki
+[sinks.loki]
+  type = "loki"
+  inputs = ["parse_json"]
+  endpoint = "http://loki-app:3100"
+  
+  # Labels to send to Loki
+  labels.service_name = "{{ service_name }}"
+  labels.job = "{{ job }}"
+  labels.container_name = "{{ container_name }}"
+  labels.environment = "{{ environment }}"
+  
+  # Remove internal Vector fields before sending
+  [sinks.loki.encoding] # <-- Corrected previously (merged blocks)
+    codec = "json"
+    except_fields = ["source_type", "host", "container_id"]
+
+# Sink: Output to console for debugging (optional)
+# [sinks.console]
+#   type = "console"
+#   inputs = ["parse_json"]
+#   encoding.codec = "json"
+#   enabled = false # Ensure this is false or commented out for production
+
+# Internal metrics
+[sources.internal_metrics]
+  type = "internal_metrics"
+
+# Expose Vector metrics for Prometheus scraping
+[sinks.prometheus_exporter]
+  type = "prometheus_exporter"
+  inputs = ["internal_metrics"]
+  address = "0.0.0.0:9598"
+  default_namespace = "vector"
+# Removed trailing EOF that might have been present
