@@ -67,14 +67,14 @@ services:
       timeout: 10s
       retries: 3
 
-  # Vector instead of Promtail
+  # Vector - reads from shared logs volume
   vector:
     image: timberio/vector:latest-alpine
     container_name: vector-observer
     restart: unless-stopped
     volumes:
       - ./vector/vector.toml:/etc/vector/vector.toml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - app-logs:/app/logs:ro  # Shared logs volume (read-only)
       - vector-data:/var/lib/vector
     command: ["--config", "/etc/vector/vector.toml"]
     depends_on:
@@ -97,6 +97,8 @@ services:
     restart: unless-stopped
     ports:
       - "5060:5060"
+    volumes:
+      - app-logs:/app/logs  # Shared logs volume (read-write)
     networks:
       - monitoring
     depends_on:
@@ -160,3 +162,4 @@ volumes:
   loki-data:
   vector-data:
   tempo-data:
+  app-logs:  # New shared volume for application logs

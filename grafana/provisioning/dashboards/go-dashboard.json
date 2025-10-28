@@ -34,7 +34,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -66,7 +66,7 @@
         "textMode": "value",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.2.0-17027759091",
       "targets": [
         {
           "$$hashKey": "object:214",
@@ -137,7 +137,7 @@
             "steps": [
               {
                 "color": "88D66C",
-                "value": null
+                "value": 0
               },
               {
                 "color": "DEAC80",
@@ -202,11 +202,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.2.0-17027759091",
       "targets": [
         {
           "$$hashKey": "object:140",
@@ -276,7 +277,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -323,11 +324,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.2.0-17027759091",
       "targets": [
         {
           "$$hashKey": "object:766",
@@ -397,7 +399,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -428,11 +430,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.2.0-17027759091",
       "targets": [
         {
           "$$hashKey": "object:214",
@@ -502,7 +505,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -534,11 +537,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.2.0-17027759091",
       "targets": [
         {
           "$$hashKey": "object:146",
@@ -610,7 +614,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -642,11 +646,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.2.0-17027759091",
       "targets": [
         {
           "$$hashKey": "object:426",
@@ -717,7 +722,7 @@
             "steps": [
               {
                 "color": "88D66C",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -743,11 +748,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.2.0-17027759091",
       "targets": [
         {
           "datasource": {
@@ -816,7 +822,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -843,11 +849,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.2.0-17027759091",
       "targets": [
         {
           "datasource": {
@@ -918,7 +925,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -950,11 +957,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.2.0-17027759091",
       "targets": [
         {
           "datasource": {
@@ -1023,7 +1031,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -1053,11 +1061,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.2.0-17027759091",
       "targets": [
         {
           "$$hashKey": "object:638",
@@ -1127,7 +1136,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -1156,11 +1165,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.2.0-17027759091",
       "targets": [
         {
           "$$hashKey": "object:638",
@@ -1200,6 +1210,7 @@
       "id": 17,
       "options": {
         "dedupStrategy": "none",
+        "enableInfiniteScrolling": false,
         "enableLogDetails": true,
         "prettifyLogMessage": false,
         "showCommonLabels": false,
@@ -1208,15 +1219,16 @@
         "sortOrder": "Descending",
         "wrapLogMessage": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.2.0-17027759091",
       "targets": [
         {
           "datasource": {
             "type": "loki",
             "uid": "P8E80F9AEF21F6940"
           },
+          "direction": "backward",
           "editorMode": "code",
-          "expr": "{job=\"docker-logs\", service_name=\"the-app\"}",
+          "expr": "{job=\"go-app-logs\", service_name=\"the-app\"}",
           "hide": false,
           "queryType": "range",
           "refId": "A"
@@ -1227,8 +1239,8 @@
     }
   ],
   "preload": false,
-  "refresh": "3s",
-  "schemaVersion": 40,
+  "refresh": "5s",
+  "schemaVersion": 41,
   "tags": [],
   "templating": {
     "list": []
@@ -1243,6 +1255,5 @@
   "timezone": "",
   "title": "Go Application Dashboard",
   "uid": "_eX4mpl3",
-  "version": 2,
-  "weekStart": ""
+  "version": 1
 }

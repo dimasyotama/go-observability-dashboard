@@ -34,8 +34,9 @@ WORKDIR /app
 # Copy the binary from builder
 COPY --from=builder /app/main .
 
-# Change ownership
-RUN chown -R appuser:appgroup /app
+# Create logs directory with proper permissions
+RUN mkdir -p /app/logs && \
+    chown -R appuser:appgroup /app
 
 # Switch to non-root user
 USER appuser

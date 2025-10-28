@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog" // New import
+	"io"
+	"log/slog"
 	"net/http"
-	"os" // New import
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -19,7 +20,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
-	"go.opentelemetry.io/otel/trace" // New import
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -43,16 +44,14 @@ var (
 		[]string{"method", "handler"},
 	)
 
-	// NEW: Counter for item operations
 	itemOperationsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "item_operations_total",
 			Help: "Total number of item operations",
 		},
-		[]string{"operation", "status"}, // operation: "create", "read"
+		[]string{"operation", "status"},
 	)
 
-	// NEW: Counter for search requests
 	searchRequestsTotal = prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Name: "search_requests_total",
@@ -60,7 +59,6 @@ var (
 		},
 	)
 
-	// NEW: Histogram for search results
 	searchResultsCount = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Name:    "search_results_count",
@@ -98,16 +96,15 @@ func init() {
 	// Register Prometheus metrics
 	prometheus.MustRegister(httpRequestsTotal)
 	prometheus.MustRegister(httpRequestDuration)
-	prometheus.MustRegister(itemOperationsTotal)   // Register new
-	prometheus.MustRegister(searchRequestsTotal)  // Register new
-	prometheus.MustRegister(searchResultsCount) // Register new
+	prometheus.MustRegister(itemOperationsTotal)
+	prometheus.MustRegister(searchRequestsTotal)
+	prometheus.MustRegister(searchResultsCount)
 }
 
 // initTracer initializes OpenTelemetry tracer
 func initTracer() (*sdktrace.TracerProvider, error) {
 	ctx := context.Background()
 
-	// Create OTLP exporter
 	conn, err := grpc.DialContext(
 		ctx,
 		"otel-collector:4317",
@@ -123,7 +120,6 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 		return nil, fmt.Errorf("failed to create OTLP exporter: %w", err)
 	}
 
-	// Create resource with service name
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
 			semconv.ServiceName("the-app"),
@@ -133,7 +129,6 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
-	// Create tracer provider
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exporter),
 		sdktrace.WithResource(res),
@@ -143,31 +138,44 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 	return tp, nil
 }
 
-// newSlogLogger creates a new structured logger
-func newSlogLogger() *slog.Logger {
-	return slog.New(slog.NewJSONHandler(os.Stdout, nil))
+// newSlogLogger creates a new structured logger that writes to both stdout and file
+func newSlogLogger() (*slog.Logger, error) {
+	// Create logs directory if it doesn't exist
+	if err := os.MkdirAll("/app/logs", 0755); err != nil {
+		return nil, fmt.Errorf("failed to create logs directory: %w", err)
+	}
+
+	// Open log file
+	logFile, err := os.OpenFile("/app/logs/app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+
+	// Create multi-writer (write to both stdout and file)
+	multiWriter := io.MultiWriter(os.Stdout, logFile)
+
+	// Create JSON handler
+	handler := slog.NewJSONHandler(multiWriter, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})
+
+	return slog.New(handler), nil
 }
 
-// structuredLogMiddleware adds a structured logger (slog) to the context,
-// including trace and span IDs.
+// structuredLogMiddleware adds a structured logger (slog) to the context
 func structuredLogMiddleware(logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Start with the base logger
 		requestLogger := logger
 
-		// Get span from OpenTelemetry context
 		span := trace.SpanFromContext(c.Request.Context())
 		if span.SpanContext().IsValid() {
-			// Add trace and span IDs to the logger
 			requestLogger = logger.With(
 				"trace_id", span.SpanContext().TraceID().String(),
 				"span_id", span.SpanContext().SpanID().String(),
 			)
 		}
 
-		// Store the request-specific logger in the Gin context
 		c.Set("logger", requestLogger)
-
 		c.Next()
 	}
 }
@@ -176,7 +184,6 @@ func structuredLogMiddleware(logger *slog.Logger) gin.HandlerFunc {
 func prometheusMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-
 		c.Next()
 
 		duration := time.Since(start).Seconds()
@@ -192,8 +199,12 @@ func prometheusMiddleware() gin.HandlerFunc {
 }
 
 func main() {
-	// Initialize base structured logger
-	logger := newSlogLogger()
+	// Initialize structured logger with file output
+	logger, err := newSlogLogger()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Initialize tracer
 	tp, err := initTracer()
@@ -214,7 +225,7 @@ func main() {
 	// Add OpenTelemetry middleware
 	router.Use(otelgin.Middleware("the-app"))
 
-	// Add new structured logging middleware *after* otelgin
+	// Add structured logging middleware
 	router.Use(structuredLogMiddleware(logger))
 
 	// Add Prometheus middleware
@@ -235,7 +246,7 @@ func main() {
 	logger.Info("Starting server on port 5060...")
 	if err := router.Run(":5060"); err != nil {
 		logger.Error("Failed to start server", "error", err)
-		os.Exit(1) // Use os.Exit for fatal errors
+		os.Exit(1)
 	}
 }
 
@@ -243,7 +254,6 @@ func main() {
 func getLogger(c *gin.Context) *slog.Logger {
 	logger, exists := c.Get("logger")
 	if !exists {
-		// Fallback to a default logger if not found, although it should be
 		return slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	}
 	return logger.(*slog.Logger)
@@ -267,7 +277,7 @@ func readItem(c *gin.Context) {
 	itemID, err := strconv.Atoi(itemIDStr)
 	if err != nil {
 		logger.Warn("Invalid item ID", "item_id", itemIDStr, "error", err)
-		itemOperationsTotal.WithLabelValues("read", "bad_request").Inc() // Record metric
+		itemOperationsTotal.WithLabelValues("read", "bad_request").Inc()
 		c.JSON(http.StatusBadRequest, gin.H{"detail": "Invalid item ID"})
 		return
 	}
@@ -275,7 +285,7 @@ func readItem(c *gin.Context) {
 	item, exists := fakeItemsDB[itemID]
 	if !exists {
 		logger.Info("Item not found", "item_id", itemID)
-		itemOperationsTotal.WithLabelValues("read", "not_found").Inc() // Record metric
+		itemOperationsTotal.WithLabelValues("read", "not_found").Inc()
 		c.JSON(http.StatusNotFound, gin.H{"detail": "Item not found"})
 		return
 	}
@@ -288,13 +298,13 @@ func readItem(c *gin.Context) {
 	}
 
 	logger.Info("Successfully retrieved item", "item_id", itemID)
-	itemOperationsTotal.WithLabelValues("read", "success").Inc() // Record metric
+	itemOperationsTotal.WithLabelValues("read", "success").Inc()
 	c.JSON(http.StatusOK, response)
 }
 
 func searchItems(c *gin.Context) {
 	logger := getLogger(c)
-	searchRequestsTotal.Inc() // Record metric
+	searchRequestsTotal.Inc()
 
 	name := c.Query("name")
 	minPriceStr := c.DefaultQuery("min_price", "0")
@@ -317,7 +327,7 @@ func searchItems(c *gin.Context) {
 		}
 	}
 
-	searchResultsCount.Observe(float64(len(results))) // Record metric
+	searchResultsCount.Observe(float64(len(results)))
 	logger.Info("Search performed", "query_name", name, "min_price", minPrice, "results_found", len(results))
 
 	c.JSON(http.StatusOK, gin.H{
@@ -330,13 +340,13 @@ func createItem(c *gin.Context) {
 	var item Item
 	if err := c.ShouldBindJSON(&item); err != nil {
 		logger.Warn("Failed to bind JSON for create item", "error", err.Error())
-		itemOperationsTotal.WithLabelValues("create", "bad_request").Inc() // Record metric
+		itemOperationsTotal.WithLabelValues("create", "bad_request").Inc()
 		c.JSON(http.StatusBadRequest, gin.H{"detail": err.Error()})
 		return
 	}
 
 	logger.Info("Item created successfully", "item_name", item.Name, "item_price", item.Price)
-	itemOperationsTotal.WithLabelValues("create", "success").Inc() // Record metric
+	itemOperationsTotal.WithLabelValues("create", "success").Inc()
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Item created successfully",
 		"item":    item,

@@ -1,72 +1,89 @@
-# Vector configuration for collecting Docker logs and sending to Loki
+# Vector configuration for reading application log files
 
 # Data directory for Vector state
 data_dir = "/var/lib/vector"
 
-# Source: Collect logs from Docker containers
-[sources.docker_logs]
-  type = "docker_logs"
-  # Only collect logs from the-app container
-  include_containers = ["the-app"]
-  # Include container metadata
-  include_labels = ["*"] # <-- Corrected previously
-  include_images = ["*"] # <-- Corrected previously
+# Source: Read logs from file
+[sources.app_logs]
+  type = "file"
+  include = ["/app/logs/app.log"]
+  read_from = "beginning"
+  fingerprint.strategy = "device_and_inode"
 
-# Transform: Add custom labels and parse logs
-[transforms.add_labels]
+# Transform: Parse JSON logs and add labels
+[transforms.parse_logs]
   type = "remap"
-  inputs = ["docker_logs"]
+  inputs = ["app_logs"]
+  drop_on_error = false
   source = '''
-    # Add service name label
-    .service_name = "the-app"
-    
-    # Add job label for compatibility with Grafana dashboards
-    .job = "docker-logs"
-    
-    # Extract container name without leading slash
-    if exists(.container_name) {
-      .container_name = replace!(.container_name, "/", "")
-    }
-    
-    # Add environment label
-    .environment = "development"
-  '''
-
-# Transform: Parse JSON logs if they exist
-[transforms.parse_json]
-  type = "remap"
-  inputs = ["add_labels"]
-  source = '''
-    # Try to parse message as JSON
+    # Parse the JSON log line
     parsed, err = parse_json(.message)
+    
+    # Only process if parsing succeeded
     if err == null {
-      . = merge!(., parsed)
+      # Extract all fields - use ! for infallible operations
+      .level = string!(parsed.level)
+      .msg = string!(parsed.msg)
+      .time = string!(parsed.time)
+      
+      # Extract trace and span IDs if they exist
+      if exists(parsed.trace_id) {
+        .trace_id = string!(parsed.trace_id)
+      }
+      if exists(parsed.span_id) {
+        .span_id = string!(parsed.span_id)
+      }
+      
+      # Extract custom application fields
+      if exists(parsed.item_id) {
+        .item_id = to_string!(parsed.item_id)
+      }
+      if exists(parsed.error) {
+        .error = string!(parsed.error)
+      }
+      if exists(parsed.query_name) {
+        .query_name = string!(parsed.query_name)
+      }
+      if exists(parsed.min_price) {
+        .min_price = to_string!(parsed.min_price)
+      }
+      if exists(parsed.results_found) {
+        .results_found = to_string!(parsed.results_found)
+      }
+      if exists(parsed.item_name) {
+        .item_name = string!(parsed.item_name)
+      }
+      if exists(parsed.item_price) {
+        .item_price = to_string!(parsed.item_price)
+      }
+      
+      # Set the message to msg field for better readability
+      .message = .msg
+      
+      # Add service labels
+      .service_name = "the-app"
+      .job = "go-app-logs"
+      .environment = "development"
     }
   '''
 
 # Sink: Send logs to Loki
 [sinks.loki]
   type = "loki"
-  inputs = ["parse_json"]
+  inputs = ["parse_logs"]
   endpoint = "http://loki-app:3100"
+  compression = "snappy"
   
-  # Labels to send to Loki
+  # Labels - only low cardinality values
   labels.service_name = "{{ service_name }}"
   labels.job = "{{ job }}"
-  labels.container_name = "{{ container_name }}"
   labels.environment = "{{ environment }}"
+  labels.level = "{{ level }}"
   
-  # Remove internal Vector fields before sending
-  [sinks.loki.encoding] # <-- Corrected previously (merged blocks)
+  # Encoding configuration
+  [sinks.loki.encoding]
     codec = "json"
-    except_fields = ["source_type", "host", "container_id"]
-
-# Sink: Output to console for debugging (optional)
-# [sinks.console]
-#   type = "console"
-#   inputs = ["parse_json"]
-#   encoding.codec = "json"
-#   enabled = false # Ensure this is false or commented out for production
+    except_fields = ["file", "host", "source_type"]
 
 # Internal metrics
 [sources.internal_metrics]
@@ -78,4 +95,3 @@ data_dir = "/var/lib/vector"
   inputs = ["internal_metrics"]
   address = "0.0.0.0:9598"
   default_namespace = "vector"
-# Removed trailing EOF that might have been present
